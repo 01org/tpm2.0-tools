@@ -197,6 +197,39 @@ tool_rc tpm2_session_open(ESYS_CONTEXT *context, tpm2_session_data *data,
     return tool_rc_success;
 }
 
+tool_rc tpm2_session_open_password(tpm2_session **session, const char *password) {
+
+    tpm2_session *s = calloc(1, sizeof(tpm2_session));
+    if (!s) {
+        LOG_ERR("oom");
+        return tool_rc_general_error;
+    }
+
+    s->input = calloc(1, sizeof(tpm2_session_data));
+    if (!s->input) {
+        free(s);
+        LOG_ERR("oom");
+        return tool_rc_general_error;
+    }
+
+    if (password) {
+        if (strlen(password) > sizeof(s->input->auth_data.buffer)) {
+            LOG_ERR("Password too big, got %zu is greater than %zu",
+                strlen(password), sizeof(s->input->auth_data.buffer));
+            free(s->input);
+            free(s);
+        }
+
+        s->input->auth_data.size = strlen(password);
+        memcpy(s->input->auth_data.buffer, password, s->input->auth_data.size);
+
+    }
+
+	s->output.session_handle = ESYS_TR_PASSWORD;
+	*session = s;
+    return tool_rc_success;
+}
+
 /* SESSION_VERSION 1 was used prior to the switch to ESAPI. As the types of
  * several of the tpm2_session_data object members have changed the version is
  * bumped.

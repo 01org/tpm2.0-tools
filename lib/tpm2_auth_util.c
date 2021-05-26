@@ -109,6 +109,10 @@ static tool_rc handle_password_session(ESYS_CONTEXT *ectx, const char *password,
         return tool_rc_general_error;
     }
 
+    if (!auth.size) {
+        return tpm2_session_open_password(session, NULL);
+    }
+
     return start_hmac_session(ectx, &auth, session);
 }
 

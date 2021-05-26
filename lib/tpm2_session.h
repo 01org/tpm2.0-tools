@@ -161,6 +161,8 @@ static inline bool tpm2_session_is_trial(tpm2_session *session) {
 tool_rc tpm2_session_open(ESYS_CONTEXT *context, tpm2_session_data *data,
         tpm2_session **session);
 
+tool_rc tpm2_session_open_password(tpm2_session **session, const char *password);
+
 /**
  * Saves session data to disk allowing tpm2_session_from_file() to
  * restore the session if applicable and frees resources.

@@ -177,10 +177,9 @@ tool_rc tpm2_nv_read(ESYS_CONTEXT *esys_context,
             goto tpm2_nvread_free_name1_name2;
         }
 
-        cp_hash->size = tpm2_alg_util_get_hash_size(
-            tpm2_session_get_authhash(auth_hierarchy_obj->session));
+        cp_hash->size = tpm2_alg_util_get_hash_size(TPM2_ALG_SHA256);
         rc = tpm2_sapi_getcphash(sys_context, name1, name2, NULL,
-            tpm2_session_get_authhash(auth_hierarchy_obj->session), cp_hash);
+            TPM2_ALG_SHA256, cp_hash);
         /*
          * Exit here without making the ESYS call since we just need the cpHash
          */
@@ -553,10 +552,9 @@ tool_rc tpm2_policy_authorize_nv(ESYS_CONTEXT *esys_context,
             goto tpm2_policyauthorizenv_free_name1_name2_name3;
         }
 
-        cp_hash->size = tpm2_alg_util_get_hash_size(
-            tpm2_session_get_authhash(auth_hierarchy_obj->session));
+        cp_hash->size = tpm2_alg_util_get_hash_size(TPM2_ALG_SHA256);
         rc = tpm2_sapi_getcphash(sys_context, name1, name2, name3,
-            tpm2_session_get_authhash(auth_hierarchy_obj->session), cp_hash);
+            TPM2_ALG_SHA256, cp_hash);
 
         /*
          * Exit here without making the ESYS call since we just need the cpHash
@@ -642,10 +640,9 @@ tool_rc tpm2_policy_nv(ESYS_CONTEXT *esys_context,
             goto tpm2_policynv_free_name1_name2_name3;
         }
 
-        cp_hash->size = tpm2_alg_util_get_hash_size(
-            tpm2_session_get_authhash(auth_hierarchy_obj->session));
+        cp_hash->size = tpm2_alg_util_get_hash_size(TPM2_ALG_SHA256);
         rc = tpm2_sapi_getcphash(sys_context, name1, name2, name3,
-            tpm2_session_get_authhash(auth_hierarchy_obj->session), cp_hash);
+            TPM2_ALG_SHA256, cp_hash);
 
         /*
          * Exit here without making the ESYS call since we just need the cpHash
@@ -1026,10 +1023,9 @@ tool_rc tpm2_evictcontrol(ESYS_CONTEXT *esys_context,
             goto tpm2_evictcontrol_free_name1_name2;
         }
 
-        cp_hash->size = tpm2_alg_util_get_hash_size(
-            tpm2_session_get_authhash(auth_hierarchy_obj->session));
+        cp_hash->size = tpm2_alg_util_get_hash_size(TPM2_ALG_SHA256);
         rc = tpm2_sapi_getcphash(sys_context, name1, name2, NULL,
-            tpm2_session_get_authhash(auth_hierarchy_obj->session), cp_hash);
+            TPM2_ALG_SHA256, cp_hash);
 
         /*
          * Exit here without making the ESYS call since we just need the cpHash
@@ -2684,10 +2680,9 @@ tool_rc tpm2_nv_increment(ESYS_CONTEXT *esys_context,
             goto tpm2_nvincrement_free_name1_name2;
         }
 
-        cp_hash->size = tpm2_alg_util_get_hash_size(
-            tpm2_session_get_authhash(auth_hierarchy_obj->session));
+        cp_hash->size = tpm2_alg_util_get_hash_size(TPM2_ALG_SHA256);
         rc = tpm2_sapi_getcphash(sys_context, name1, name2, NULL,
-            tpm2_session_get_authhash(auth_hierarchy_obj->session), cp_hash);
+            TPM2_ALG_SHA256, cp_hash);
 
         /*
          * Exit here without making the ESYS call since we just need the cpHash
@@ -2762,10 +2757,9 @@ tool_rc tpm2_nvreadlock(ESYS_CONTEXT *esys_context,
             goto tpm2_nvreadlock_free_name1_name2;
         }
 
-        cp_hash->size = tpm2_alg_util_get_hash_size(
-            tpm2_session_get_authhash(auth_hierarchy_obj->session));
+        cp_hash->size = tpm2_alg_util_get_hash_size(TPM2_ALG_SHA256);
         rc = tpm2_sapi_getcphash(sys_context, name1, name2, NULL,
-            tpm2_session_get_authhash(auth_hierarchy_obj->session), cp_hash);
+            TPM2_ALG_SHA256, cp_hash);
 
         /*
          * Exit here without making the ESYS call since we just need the cpHash
@@ -2841,10 +2835,9 @@ tool_rc tpm2_nvwritelock(ESYS_CONTEXT *esys_context,
             goto tpm2_nvwritelock_free_name1_name2;
         }
 
-        cp_hash->size = tpm2_alg_util_get_hash_size(
-            tpm2_session_get_authhash(auth_hierarchy_obj->session));
+        cp_hash->size = tpm2_alg_util_get_hash_size(TPM2_ALG_SHA256);
         rc = tpm2_sapi_getcphash(sys_context, name1, name2, NULL,
-            tpm2_session_get_authhash(auth_hierarchy_obj->session), cp_hash);
+            TPM2_ALG_SHA256, cp_hash);
 
         /*
          * Exit here without making the ESYS call since we just need the cpHash
@@ -2906,10 +2899,9 @@ tool_rc tpm2_nvglobalwritelock(ESYS_CONTEXT *esys_context,
             goto tpm2_globalnvwritelock_free_name1;
         }
 
-        cp_hash->size = tpm2_alg_util_get_hash_size(
-            tpm2_session_get_authhash(auth_hierarchy_obj->session));
+        cp_hash->size = tpm2_alg_util_get_hash_size(TPM2_ALG_SHA256);
         rc = tpm2_sapi_getcphash(sys_context, name1, NULL, NULL,
-            tpm2_session_get_authhash(auth_hierarchy_obj->session), cp_hash);
+            TPM2_ALG_SHA256, cp_hash);
 
         /*
          * Exit here without making the ESYS call since we just need the cpHash
@@ -2994,10 +2986,9 @@ tool_rc tpm2_nvsetbits(ESYS_CONTEXT *esys_context,
             goto tpm2_nvsetbits_free_name1_name2;
         }
 
-        cp_hash->size = tpm2_alg_util_get_hash_size(
-            tpm2_session_get_authhash(auth_hierarchy_obj->session));
+        cp_hash->size = tpm2_alg_util_get_hash_size(TPM2_ALG_SHA256);
         rc = tpm2_sapi_getcphash(sys_context, name1, name2, NULL,
-            tpm2_session_get_authhash(auth_hierarchy_obj->session), cp_hash);
+            TPM2_ALG_SHA256, cp_hash);
 
         /*
          * Exit here without making the ESYS call since we just need the cpHash
@@ -3160,10 +3151,9 @@ tool_rc tpm2_nvundefine(ESYS_CONTEXT *esys_context,
             goto tpm2_nvundefine_free_name1_name2;
         }
 
-        cp_hash->size = tpm2_alg_util_get_hash_size(
-            tpm2_session_get_authhash(auth_hierarchy_obj->session));
+        cp_hash->size = tpm2_alg_util_get_hash_size(TPM2_ALG_SHA256);
         rc = tpm2_sapi_getcphash(sys_context, name1, name2, NULL,
-            tpm2_session_get_authhash(auth_hierarchy_obj->session), cp_hash);
+            TPM2_ALG_SHA256, cp_hash);
 
         /*
          * Exit here without making the ESYS call since we just need the cpHash
@@ -3244,10 +3234,9 @@ tool_rc tpm2_nvundefinespecial(ESYS_CONTEXT *esys_context,
             goto tpm2_nvundefinespecial_free_name1_name2;
         }
 
-        cp_hash->size = tpm2_alg_util_get_hash_size(
-            tpm2_session_get_authhash(auth_hierarchy_obj->session));
+        cp_hash->size = tpm2_alg_util_get_hash_size(TPM2_ALG_SHA256);
         rc = tpm2_sapi_getcphash(sys_context, name1, name2, NULL,
-            tpm2_session_get_authhash(auth_hierarchy_obj->session), cp_hash);
+            TPM2_ALG_SHA256, cp_hash);
 
         /*
          * Exit here without making the ESYS call since we just need the cpHash
@@ -3329,10 +3318,9 @@ tool_rc tpm2_nvwrite(ESYS_CONTEXT *esys_context,
             goto tpm2_nvwrite_free_name1_name2;
         }
 
-        cp_hash->size = tpm2_alg_util_get_hash_size(
-            tpm2_session_get_authhash(auth_hierarchy_obj->session));
+        cp_hash->size = tpm2_alg_util_get_hash_size(TPM2_ALG_SHA256);
         rc = tpm2_sapi_getcphash(sys_context, name1, name2, NULL,
-            tpm2_session_get_authhash(auth_hierarchy_obj->session), cp_hash);
+            TPM2_ALG_SHA256, cp_hash);
         /*
          * Exit here without making the ESYS call since we just need the cpHash
          */

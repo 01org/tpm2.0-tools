@@ -3,7 +3,7 @@
 
 set -e
 
-source $TRAVIS_BUILD_DIR/.ci/docker-prelude.sh
+source $DOCKER_BUILD_DIR/.ci/docker-prelude.sh
 
 if [ -d build ]; then
   rm -rf build
@@ -76,6 +76,55 @@ make -j$(nproc)
 make -j check
 
 popd
+
+#
+# Backwards compatibility test for ensuring we do not break the tool options
+# determined in 4.X release.
+#
+if [[ "${TPM2_TSS_VERSION}" == "master" && "$CC" != clang* ]];then
+  echo "tpm2-tools v4.X compatibility test follows"
+  git fetch origin refs/tags/4.3.0:refs/tags/4.3.0
+  git checkout 4.3.0 test/integration/tests
+  git clean -fdx tests/integration/fapi
+  #
+  # RSA OAEP decryption was enabled as a feature after 4.X and so testing it
+  # would signal a false compatibility test failure.
+  #
+  git checkout HEAD test/integration/tests/rsadecrypt.sh
+  #
+  # tpm2_getekcertificate is known to break backwards compatibility
+  #
+  git checkout HEAD test/integration/tests/getekcertificate.sh
+  #
+  # symlink is an irrelevant test for 4.X branch
+  #
+  rm test/integration/tests/symlink.sh
+
+  #
+  # Beyond 4.X release, the tpm2-tools were combined into a single
+  # busybox style binary "tpm2". The following makes adjustments
+  # to the tool-name which essentially invokes the same tools.
+  #
+  for f in `find test/integration/tests -iname '*.sh'`
+  do
+      for i in `find tools -iname 'tpm2*.c'`
+      do
+          test=$(basename $i .c)
+          replace=$(basename $i .c | sed  's/tpm2_//g')
+          sed -i "s/$test/tpm2 $replace/g" $f
+      done
+  done
+
+  ./bootstrap
+
+  mkdir compatibility_testbuild
+  pushd compatibility_testbuild
+  ../configure --enable-unit --disable-fapi --disable-hardening --with-tpmsim=tpm_server
+  make -j$(nproc)
+  make check -j$(nproc)
+  popd
+  git reset --hard HEAD
+fi
 
 # back in root git directory, check for whitespace errors. We do this post CI
 # so people can verify the rest of their patch works in CI before dying.

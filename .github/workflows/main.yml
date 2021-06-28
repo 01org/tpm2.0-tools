@@ -1,0 +1,77 @@
+name: CI
+on:
+  [push, pull_request]
+jobs:
+  generic-build-test:
+    runs-on: ubuntu-latest
+    if: "!contains(github.ref, 'coverity_scan')"
+    strategy:
+      matrix:
+        docker_image: [ubuntu-18.04, ubuntu-20.04, fedora-30, opensuse-leap]
+        compiler: [gcc, clang]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+      - name: Launch Container
+        env:
+          DOCKER_IMAGE: ${{ matrix.docker_image }}
+          CC: ${{ matrix.compiler }}
+        run: ./.ci/travis.run
+      - name: failure
+        if: ${{ failure() }}
+        run: cat build/test-suite.log || true
+  master-tss-build-test:
+    runs-on: ubuntu-latest
+    if: "!contains(github.ref, 'coverity_scan')"
+    strategy:
+      matrix:
+        tss_version: [master]
+        docker_image: [ubuntu-18.04]
+        compiler: [gcc, clang]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+      - name: Launch Container
+        env:
+          DOCKER_IMAGE: ${{ matrix.docker_image }}
+          CC: ${{ matrix.compiler }}
+          TPM2_TSS_VERSION: master
+          GIT_FULL_CLONE: true
+        run: ./.ci/travis.run
+      - name: failure
+        if: ${{ failure() }}
+        run: cat build/test-suite.log || true
+  coverage-test:
+    runs-on: ubuntu-latest
+    if: "!contains(github.ref, 'coverity_scan')"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+      - name: Launch Container
+        env:
+          ENABLE_COVERAGE: true
+          DOCKER_IMAGE: ubuntu-18.04
+          CC: gcc
+        run: ./.ci/travis.run
+      - name: failure
+        if: ${{ failure() }}
+        run: cat build/test-suite.log || true
+  coverity-test:
+    runs-on: ubuntu-latest
+    if: contains(github.ref, 'coverity_scan')
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+      - name: Launch Container
+        env:
+          REPO_BRANCH: ${{ github.ref }}
+          REPO_SLUG: ${{ github.repository }}
+          ENABLE_COVERITY: true
+          DOCKER_IMAGE: ubuntu-18.04
+          CC: gcc
+          COVERITY_SCAN_TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
+          COVERITY_SUBMISSION_EMAIL: william.c.roberts@gmail.com
+        run: ./.ci/travis.run
+      - name: failure
+        if: ${{ failure() }}
+        run: cat build/test-suite.log || true

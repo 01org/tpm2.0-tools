@@ -124,13 +124,13 @@ tpm2 nvundefine 1
 
 # Test tpm2 nvread
 create_authorized_policy
-tpm2 nvdefine 1 -s 8 -a "ownerwrite|policyread" -L authorized.policy
+tpm2 nvdefine 1 -a "ownerwrite|policyread" -L authorized.policy
 echo "foo" | tpm2 nvwrite 1 -i- -C o
-tpm2 nvread 1 -s 8 --cphash cp.hash
+tpm2 nvread 1 --cphash cp.hash
 generate_policycphash
 sign_and_verify_policycphash
 setup_authorized_policycphash
-tpm2 nvread 1 -s 8 -P "session:session.ctx" | xxd -p
+tpm2 nvread 1 -P "session:session.ctx" | xxd -p
 ## test the failing scenario
 setup_authorized_policycphash
 trap - ERR

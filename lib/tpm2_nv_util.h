@@ -6,6 +6,8 @@
 #include <tss2/tss2_esys.h>
 #include <string.h>
 
+#include <openssl/sha.h>
+
 #include "log.h"
 #include "tpm2.h"
 #include "tpm2_capability.h"
@@ -155,69 +157,100 @@ static inline tool_rc tpm2_util_nv_read(ESYS_CONTEXT *ectx,
     UINT16 *bytes_written, TPM2B_DIGEST *cp_hash,
     TPMI_ALG_HASH parameter_hash_algorithm) {
 
-    *data_buffer = NULL;
-
-    TPM2B_NV_PUBLIC *nv_public = NULL;
-    tool_rc rc = tpm2_util_nv_read_public(ectx, nv_index, &nv_public);
-    if (rc != tool_rc_success) {
-        goto out;
-    }
-
-    UINT16 data_size = nv_public->nvPublic.dataSize;
-    free(nv_public);
-
-    /* if size is 0, assume the whole object */
-    if (size == 0) {
-        size = data_size;
-    }
-
-    if (offset > data_size) {
-        LOG_ERR("Requested offset to read from is greater than size. offset=%u"
-                ", size=%u", offset, data_size);
-        rc = tool_rc_general_error;
-        goto out;
-    }
-
-    if (offset + size > data_size) {
-        LOG_ERR("Requested to read more bytes than available from offset,"
-                " offset=%u, request-read-size=%u actual-data-size=%u", offset,
-                size, data_size);
-        rc = tool_rc_general_error;
-        goto out;
-    }
-
-    if (cp_hash->size) {
-        goto tpm2_util_nv_read_collect_cp_hash;
-    }
-
-    uint16_t max_data_size = tpm2_nv_util_max_allowed_nv_size(ectx, false);
-
-tpm2_util_nv_read_collect_cp_hash:
-    if (cp_hash->size) {
-        TPM2B_MAX_NV_BUFFER *nv_data;
-        rc = tpm2_nv_read(ectx, auth_hierarchy_obj, nv_index, size, offset,
-            &nv_data, cp_hash, parameter_hash_algorithm);
+    /*
+     * NVRead is not dispatched when only calculating cpHash.
+     */
+    bool is_nvread_dispatched = cp_hash->size ? false : true;
+    tool_rc rc = tool_rc_success;
+    /*
+     * Perform additional checks on the NV index size when actually dispatching
+     * NVRead command.
+     */
+    if (is_nvread_dispatched) {
+        TPM2B_NV_PUBLIC *nv_public = NULL;
+        rc = tpm2_util_nv_read_public(ectx, nv_index, &nv_public);
         if (rc != tool_rc_success) {
-            LOG_ERR("Failed cpHash for NVRAM read at index 0x%X", nv_index);
+            goto out;
         }
-        goto out;
+
+        UINT16 data_size = nv_public->nvPublic.dataSize;
+        free(nv_public);
+
+        /* if size is 0, assume the whole object */
+        if (size == 0) {
+            size = data_size;
+        }
+
+        if (offset > data_size) {
+            LOG_ERR("Requested offset to read from is greater than size. offset=%u"
+                    ", size=%u", offset, data_size);
+            rc = tool_rc_general_error;
+            goto out;
+        }
+
+        if (offset + size > data_size) {
+            LOG_ERR("Requested to read more bytes than available from offset,"
+                    " offset=%u, request-read-size=%u actual-data-size=%u", offset,
+                    size, data_size);
+            rc = tool_rc_general_error;
+            goto out;
+        }
+
+        *data_buffer = malloc(data_size);
+        if (!*data_buffer) {
+            LOG_ERR("oom");
+            rc = tool_rc_general_error;
+            goto out;
+        }
+    } else {
+        *data_buffer = 0;
     }
 
-    *data_buffer = malloc(data_size);
-    if (!*data_buffer) {
-        LOG_ERR("oom");
-        rc = tool_rc_general_error;
-        goto out;
+    /*
+     * It is possible that the NV Read operation has a buffer size smaller than
+     * that of an NV Index. In such scenarios, the cpHash digest is extended to
+     * emulate the cpHash calculation on the TPM.
+     *
+     * The extension comes from the fact that when there is a larger buffer,
+     * this tool dispatches multiple NV Reads until all the chunks are read.
+     */
+    bool is_sha_op_success = false;
+    #define SHA_OP_CHECK \
+    do { \
+        if (!is_sha_op_success) { \
+            LOG_ERR("SHA operation failed when calculating pHash"); \
+            rc = tool_rc_general_error; \
+            goto out; \
+        } \
+    } while(0);
+    SHA256_CTX sha_ctx_256_or_224;
+    SHA512_CTX sha_ctx_512_or_384;
+    switch (cp_hash->size) {
+        case SHA224_DIGEST_LENGTH:
+            is_sha_op_success = SHA224_Init(&sha_ctx_256_or_224);
+            SHA_OP_CHECK;
+            break;
+        case SHA256_DIGEST_LENGTH:
+            is_sha_op_success = SHA256_Init(&sha_ctx_256_or_224);
+            SHA_OP_CHECK;
+            break;
+        case SHA384_DIGEST_LENGTH:
+            is_sha_op_success = SHA384_Init(&sha_ctx_512_or_384);
+            SHA_OP_CHECK;
+            break;
+        case SHA512_DIGEST_LENGTH:
+            is_sha_op_success = SHA512_Init(&sha_ctx_512_or_384);
+            SHA_OP_CHECK;
+            break;
+        default:
+            break;
     }
 
     UINT16 data_offset = 0;
-
+    UINT16 max_data_size = tpm2_nv_util_max_allowed_nv_size(ectx, false);
     while (size > 0) {
-
         UINT16 bytes_to_read = size > max_data_size ? max_data_size : size;
-
         TPM2B_MAX_NV_BUFFER *nv_data;
-
         rc = tpm2_nv_read(ectx, auth_hierarchy_obj, nv_index, bytes_to_read,
             offset, &nv_data, cp_hash, parameter_hash_algorithm);
         if (rc != tool_rc_success) {
@@ -225,16 +258,67 @@ tpm2_util_nv_read_collect_cp_hash:
             goto out;
         }
 
+        switch (cp_hash->size) {
+            case SHA224_DIGEST_LENGTH:
+                is_sha_op_success = SHA224_Update(&sha_ctx_256_or_224, cp_hash->buffer,
+                    cp_hash->size);
+                SHA_OP_CHECK;
+                break;
+            case SHA256_DIGEST_LENGTH:
+                is_sha_op_success = SHA256_Update(&sha_ctx_256_or_224, cp_hash->buffer,
+                    cp_hash->size);
+                SHA_OP_CHECK;
+                break;
+            case SHA384_DIGEST_LENGTH:
+                is_sha_op_success = SHA384_Update(&sha_ctx_512_or_384, cp_hash->buffer,
+                    cp_hash->size);
+                SHA_OP_CHECK;
+                break;
+            case SHA512_DIGEST_LENGTH:
+                SHA512_Update(&sha_ctx_512_or_384, cp_hash->buffer,
+                    cp_hash->size);
+                SHA_OP_CHECK;
+                break;
+            default:
+                break;
+        }
+
         size -= nv_data->size;
         offset += nv_data->size;
 
-        memcpy(*data_buffer + data_offset, nv_data->buffer, nv_data->size);
-        data_offset += nv_data->size;
-
-        free(nv_data);
+        if (is_nvread_dispatched) {
+            memcpy(*data_buffer + data_offset, nv_data->buffer, nv_data->size);
+            data_offset += nv_data->size;
+            free(nv_data);
+        }
     }
 
-    if (bytes_written) {
+    switch (cp_hash->size) {
+        case SHA224_DIGEST_LENGTH:
+            is_sha_op_success = SHA224_Final(cp_hash->buffer,
+                &sha_ctx_256_or_224);
+            SHA_OP_CHECK;
+            break;
+        case SHA256_DIGEST_LENGTH:
+            is_sha_op_success = SHA256_Final(cp_hash->buffer,
+                &sha_ctx_256_or_224);
+            SHA_OP_CHECK;
+            break;
+        case SHA384_DIGEST_LENGTH:
+            is_sha_op_success = SHA384_Final(cp_hash->buffer,
+                &sha_ctx_512_or_384);
+            SHA_OP_CHECK;
+            break;
+        case SHA512_DIGEST_LENGTH:
+            is_sha_op_success = SHA512_Final(cp_hash->buffer,
+                &sha_ctx_512_or_384);
+            SHA_OP_CHECK;
+            break;
+        default:
+            break;
+    }
+
+    if (is_nvread_dispatched && bytes_written) {
         *bytes_written = data_offset;
     }
 

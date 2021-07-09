@@ -309,6 +309,30 @@ tool_rc tpm2_policy_build_policysecret(ESYS_CONTEXT *ectx,
         }
     }
 
+    if (!ectx || true) {
+        if (is_nonce_tpm) {
+            LOG_ERR("Cannot specify is_nonce_tpm with NULL ESYS Context");
+            return tool_rc_general_error;
+        }
+        /* TODO: Get old from input file -L */
+        TPM2B_DIGEST old = { 0 };
+        old.size = 32;
+        /* TODO get name, not hardcoded! */
+        TPM2B_NAME name ={
+                .size = 4,
+                .name = { 0x40, 0x00, 0x00, 0x01 }
+        };
+        /* TODO get halg */
+        /* TODO This needs to be tied to Esys_Malloc.... but that doesn't exist */
+        TPMT_TK_AUTH *pt = calloc(sizeof(*pt), 1);
+        /* TODO error check */
+        tool_rc rc = tpm2_policy_secret_no_tpm(TPM2_ALG_SHA256, &old, &name, &policy_qualifier, pt);
+        if (rc == tool_rc_success) {
+            *policy_ticket = pt;
+        }
+        return rc;
+    }
+
     ESYS_TR policy_session_handle = tpm2_session_get_handle(policy_session);
 
     TPM2B_NONCE *nonce_tpm = NULL;

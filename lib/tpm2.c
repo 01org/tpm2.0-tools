@@ -685,6 +685,106 @@ tool_rc tpm2_policy_countertimer(ESYS_CONTEXT *esys_context,
     return tool_rc_success;
 }
 
+static tool_rc policy_update(TPMI_ALG_HASH halg, TPM2_CC cc, TPM2B_NAME *name, TPM2B_DIGEST *old, TPM2B_NONCE *ref, TPM2B_DIGEST *new) {
+
+    tool_rc result = tool_rc_general_error;
+    const EVP_MD *md = tpm2_openssl_halg_from_tpmhalg(halg);
+    if (!md) {
+        LOG_ERR("Could not find digester for algorithm 0x%x", halg);
+        return tool_rc_general_error;
+    }
+
+    EVP_MD_CTX *mdctx = EVP_MD_CTX_create();
+    if (!mdctx) {
+        LOG_ERR("%s", tpm2_openssl_get_err());
+        return tool_rc_general_error;
+    }
+
+    int rc = EVP_DigestInit_ex(mdctx, md, NULL);
+    if (!rc) {
+        LOG_ERR("%s", tpm2_openssl_get_err());
+        goto out;
+    }
+
+    rc = EVP_DigestUpdate(mdctx, old->buffer, old->size);
+    if (!rc) {
+        LOG_ERR("%s", tpm2_openssl_get_err());
+        goto out;
+    }
+
+    TPM2_CC becc = tpm2_util_hton_32(cc);
+    rc = EVP_DigestUpdate(mdctx, &becc, sizeof(becc));
+    if (!rc) {
+        LOG_ERR("%s", tpm2_openssl_get_err());
+        goto out;
+    }
+
+    if (name) {
+        rc = EVP_DigestUpdate(mdctx, name->name, name->size);
+        if (!rc) {
+            LOG_ERR("%s", tpm2_openssl_get_err());
+            goto out;
+        }
+    }
+
+    unsigned size = EVP_MD_size(md);
+    rc = EVP_DigestFinal_ex(mdctx, new->buffer, &size);
+    if (!rc) {
+        LOG_ERR("%s", tpm2_openssl_get_err());
+        goto out;
+    }
+    /* hash sizes are not bigger than 16 bits, safe truncate */
+    new->size = (UINT16)size;
+
+    if(ref) {
+        mdctx = EVP_MD_CTX_create();
+        if (!mdctx) {
+            LOG_ERR("%s", tpm2_openssl_get_err());
+            goto out;
+        }
+
+        rc = EVP_DigestInit_ex(mdctx, md, NULL);
+        if (!rc) {
+            LOG_ERR("%s", tpm2_openssl_get_err());
+            goto out;
+        }
+
+        rc = EVP_DigestUpdate(mdctx, new->buffer, new->size);
+        if (!rc) {
+            LOG_ERR("%s", tpm2_openssl_get_err());
+            goto out;
+        }
+
+        rc = EVP_DigestUpdate(mdctx, ref->buffer, ref->size);
+        if (!rc) {
+            LOG_ERR("%s", tpm2_openssl_get_err());
+            goto out;
+        }
+
+        unsigned size = EVP_MD_size(md);
+        rc = EVP_DigestFinal_ex(mdctx, new->buffer, &size);
+        if (!rc) {
+            LOG_ERR("%s", tpm2_openssl_get_err());
+            goto out;
+        }
+        /* hash sizes are not bigger than 16 bits, safe truncate */
+        new->size = (UINT16)size;
+    }
+
+    result = tool_rc_success;
+
+out:
+    EVP_MD_CTX_destroy(mdctx);
+    return result;
+}
+
+
+tool_rc tpm2_policy_secret_no_tpm(TPMI_ALG_HASH halg, TPM2B_DIGEST *current, TPM2B_NAME *name, TPM2B_NONCE *policy_qualifier,
+        TPMT_TK_AUTH *new) {
+
+    return policy_update(halg, TPM2_CC_PolicySecret, name, current, policy_qualifier, &new->digest);
+}
+
 tool_rc tpm2_policy_secret(ESYS_CONTEXT *esys_context,
         tpm2_loaded_object *auth_entity_obj, ESYS_TR policy_session,
         INT32 expiration, TPMT_TK_AUTH **policy_ticket,

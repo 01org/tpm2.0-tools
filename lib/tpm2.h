@@ -118,6 +118,9 @@ tool_rc tpm2_policy_ticket(ESYS_CONTEXT *esys_context, ESYS_TR policy_session,
 tool_rc tpm2_policy_authvalue(ESYS_CONTEXT *esys_context, ESYS_TR policy_session,
         ESYS_TR shandle1, ESYS_TR shandle2, ESYS_TR shandle3);
 
+tool_rc tpm2_policy_secret_no_tpm(TPMI_ALG_HASH halg, TPM2B_DIGEST *current, TPM2B_NAME *name, TPM2B_NONCE *policy_qualifier,
+        TPMT_TK_AUTH *new);
+
 tool_rc tpm2_policy_secret(ESYS_CONTEXT *esys_context,
         tpm2_loaded_object *auth_entity_obj, ESYS_TR policy_session,
         INT32 expiration, TPMT_TK_AUTH **policy_ticket,

@@ -9,7 +9,8 @@ cleanup() {
     public.pem plain.rsa.enc plain.rsa.dec public.pem data.in.raw \
     data.in.digest data.out.signed ticket.out ecc.pub ecc.priv ecc.name \
     ecc.ctx private.ecc.pem public.ecc.pem passfile aes.key policy.dat \
-    aes.priv aes.pub
+    aes.priv aes.pub sealdata seal.pub seal.priv seal.ctx unsealdata hmackey \
+    hmac.pub hmac.priv hmac.ctx hmac-tpm2.out hmac-ossl.out
 
     if [ "$1" != "no-shut-down" ]; then
           shut_down
@@ -167,6 +168,26 @@ run_aes_policy_import_test() {
         trap onerror ERR
 }
 
+run_keyedhash_seal_import_test() {
+
+    dd if=/dev/urandom of=sealdata bs=128 count=1
+    tpm2 import -C "$1" -G hmac -i sealdata -a 'userwithauth' -u seal.pub -r seal.priv
+    tpm2 load -C "$1" -u seal.pub -r seal.priv -c seal.ctx
+    tpm2 unseal -c seal.ctx -o unsealdata
+    cmp sealdata unsealdata
+}
+
+run_keyedhash_hmac_import_test() {
+
+    dd if=/dev/urandom of=hmackey bs=73 count=1
+    hexkey=$(xxd -p -c 256 < hmackey)
+    tpm2 import -C "$1" -G hmac -i hmackey -u hmac.pub -r hmac.priv
+    tpm2 load -C "$1" -u hmac.pub -r hmac.priv -c hmac.ctx
+    echo -n "test data" | tpm2 hmac -g sha256 -c hmac.ctx -o hmac-tpm2.out
+    echo -n "test data" | openssl dgst -sha256 -mac HMAC -macopt hexkey:"$hexkey" -binary -out hmac-ossl.out
+    cmp hmac-tpm2.out hmac-ossl.out
+}
+
 run_test() {
 
     cleanup "no-shut-down"
@@ -189,6 +210,9 @@ run_test() {
     run_rsa_import_test parent.ctx 2048
 
     run_ecc_import_test parent.ctx prime256v1
+
+    run_keyedhash_seal_import_test parent.ctx
+    run_keyedhash_hmac_import_test parent.ctx
 }
 
 #

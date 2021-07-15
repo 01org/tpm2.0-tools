@@ -25,6 +25,7 @@ These options control the key importation process:
     * **aes** - AES 128, 192 or 256 key.
     * **rsa** - RSA 1024 or 2048 key.
     * **ecc** - ECC NIST P192, P224, P256, P384 or P521 public and private key.
+	* **hmac** - HMAC key.
 
   * **-g**, **\--hash-algorithm**=_ALGORITHM_:
 

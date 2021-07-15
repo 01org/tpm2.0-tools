@@ -197,7 +197,7 @@ static bool on_option(char key, char *value) {
         break;
     case 'G':
         ctx.key_type = tpm2_alg_util_from_optarg(value,
-                tpm2_alg_util_flags_asymmetric | tpm2_alg_util_flags_symmetric);
+                tpm2_alg_util_flags_asymmetric | tpm2_alg_util_flags_symmetric | tpm2_alg_util_flags_keyedhash );
         if (ctx.key_type == TPM2_ALG_ERROR) {
             LOG_ERR("Unsupported key type");
             return false;

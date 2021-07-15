@@ -1018,6 +1018,37 @@ static bool load_public_AES_from_file(FILE *f, const char *path,
     return tpm2_util_calc_unique(name_alg, key, seed, unique);
 }
 
+static bool load_public_KEYEDHASH_from_file(FILE *f, const char *path,
+        TPM2B_PUBLIC *pub, TPM2B_SENSITIVE *priv) {
+
+    /*
+     * Get the file size and validate that it is within the allowed size for keyed hash objects
+     */
+    unsigned long file_size = 0;
+    bool result = files_get_file_size(f, &file_size, path);
+    if (!result) {
+        return false;
+    }
+
+    if (file_size > 128 || file_size == 0) {
+        return false;
+    }
+
+    pub->publicArea.type = TPM2_ALG_KEYEDHASH;
+    TPMT_KEYEDHASH_SCHEME *s = &pub->publicArea.parameters.keyedHashDetail.scheme;
+    s->scheme = TPM2_ALG_NULL;
+
+    /*
+     * Calculate the unique field, same as for AES keys
+     */
+    TPM2B_DIGEST *unique = &pub->publicArea.unique.keyedHash;
+    TPM2B_DIGEST *seed = &priv->sensitiveArea.seedValue;
+    TPM2B_PRIVATE_VENDOR_SPECIFIC *key = &priv->sensitiveArea.sensitive.any;
+    TPMI_ALG_HASH name_alg = pub->publicArea.nameAlg;
+
+    return tpm2_util_calc_unique(name_alg, key, seed, unique);
+}
+
 static bool load_private_RSA_from_key(RSA *k, TPM2B_SENSITIVE *priv) {
 
     const BIGNUM *p; /* the private key exponent */
@@ -1222,6 +1253,39 @@ static tpm2_openssl_load_rc load_private_AES_from_file(FILE *f,
     return lprc_private | lprc_public;
 }
 
+static tpm2_openssl_load_rc load_private_KEYEDHASH_from_file(FILE *f,
+        const char *path, TPM2B_PUBLIC *pub, TPM2B_SENSITIVE *priv) {
+
+    unsigned long file_size = 0;
+    bool result = files_get_file_size(f, &file_size, path);
+    if (!result) {
+        return lprc_error;
+    }
+
+    if (file_size > 128 || file_size == 0) {
+      LOG_ERR("Invalid keyedhash key size, got %lu bytes, expected 1 to 128 bytes",
+                file_size);
+      return lprc_error;
+    }
+
+    priv->sensitiveArea.sensitiveType = TPM2_ALG_KEYEDHASH;
+
+    TPM2B_SENSITIVE_DATA *b = &priv->sensitiveArea.sensitive.bits;
+    b->size = file_size;
+
+    result = files_read_bytes(f, b->buffer, b->size);
+    if (!result) {
+        return lprc_error;
+    }
+
+    result = load_public_KEYEDHASH_from_file(f, path, pub, priv);
+    if (!result) {
+        return lprc_error;
+    }
+
+    return lprc_private | lprc_public;
+}
+
 /**
  * Loads a private portion of a key, and possibly the public portion, as for RSA the public data is in
  * a private pem file.
@@ -1262,6 +1326,14 @@ tpm2_openssl_load_rc tpm2_openssl_load_private(const char *path,
             rc = load_private_AES_from_file(f, path, pub, priv);
         }
         break;
+    case TPM2_ALG_HMAC:
+        if (pass) {
+            LOG_ERR("No password can be used for protecting HMAC key");
+            rc = lprc_error;
+        } else {
+            rc = load_private_KEYEDHASH_from_file(f, path, pub, priv);
+	}
+      break;
     case TPM2_ALG_ECC:
         rc = load_private_ECC_from_pem(f, path, pass, pub, priv);
         break;
